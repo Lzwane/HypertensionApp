@@ -1,72 +1,127 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useColorScheme, StatusBar } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [userName, setUserName] = useState('User');
+  const colorScheme = useColorScheme(); // Detects Dark Mode
+  const isDark = colorScheme === 'dark';
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUser();
+    }, [])
+  );
+
+  const loadUser = async () => {
+    try {
+      const name = await AsyncStorage.getItem('user_name');
+      if (name) setUserName(name);
+    } catch (e) { console.log(e); }
+  };
 
   const MenuItem = ({ title, icon, color, route, desc }: any) => (
-    <TouchableOpacity style={styles.menuItem} onPress={() => router.push(route)}>
+    <TouchableOpacity 
+      style={[styles.menuItem, isDark && styles.menuItemDark]} 
+      onPress={() => router.push(route)}
+    >
       <View style={[styles.iconBox, { backgroundColor: color }]}>
         <Ionicons name={icon} size={28} color="white" />
       </View>
       <View style={styles.menuText}>
-        <Text style={styles.menuTitle}>{title}</Text>
-        <Text style={styles.menuDesc}>{desc}</Text>
+        <Text style={[styles.menuTitle, isDark && styles.textLight]}>{title}</Text>
+        <Text style={[styles.menuDesc, isDark && styles.textGray]}>{desc}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={24} color="#ccc" />
+      <Ionicons name="chevron-forward" size={24} color={isDark ? "#555" : "#ccc"} />
     </TouchableOpacity>
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Header Section */}
+    <ScrollView contentContainerStyle={[styles.container, isDark && styles.containerDark]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      
+      {/* BRANDING HEADER */}
+      <View style={styles.brandingHeader}>
+        <View style={styles.logoBadge}>
+          <Ionicons name="flask" size={16} color="white" />
+        </View>
+        <Text style={[styles.brandingText, isDark && styles.textLight]}>JB LABS</Text>
+      </View>
+
+      {/* USER GREETING */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello,</Text>
-          <Text style={styles.username}>User</Text>
+          <Text style={styles.greeting}>Good Morning,</Text>
+          <Text style={[styles.username, isDark && styles.textLight]}>{userName}</Text>
         </View>
-        <TouchableOpacity style={styles.profileBtn}>
-          <Ionicons name="person" size={24} color="#555" />
+        <TouchableOpacity 
+          style={[styles.profileBtn, isDark && styles.profileBtnDark]} 
+          onPress={() => router.push('/profile')}
+        >
+          <Ionicons name="person" size={24} color={isDark ? "#fff" : "#555"} />
         </TouchableOpacity>
       </View>
 
-      {/* Main Action Grid */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      
-      <View style={styles.menuContainer}>
-        <MenuItem 
-          title="Find Pharmacy" 
-          icon="location" 
-          color="#e74c3c" 
-          route="/pharmacy"
-          desc="Locate nearby refills"
-        />
-        
-        <MenuItem 
-          title="Generate Report" 
-          icon="document-text" 
-          color="#27ae60" 
-          route="/report" 
-          desc="Share data with doctor"
-        />
-
-        <MenuItem 
-          title="Emergency Info" 
-          icon="medical" 
-          color="#c0392b" 
-          route="/emergency" // Linking to mergency
-          desc="BP > 180/120 guide"
-        />
-      </View>
-
-      {/* Insight Card */}
+      {/* INSIGHT CARD */}
       <View style={styles.insightCard}>
         <Ionicons name="trending-up" size={40} color="white" />
         <View style={styles.insightContent}>
           <Text style={styles.insightTitle}>Weekly Status</Text>
-          <Text style={styles.insightText}>You've tracked your BP 0 times this week. Keep it up!</Text>
+          <Text style={styles.insightText}>
+            Regular tracking helps your doctor make better decisions.
+          </Text>
         </View>
+      </View>
+
+      {/* MAIN ACTIONS - Pushed down with marginTop */}
+      <View style={styles.menuContainer}>
+        <Text style={[styles.sectionTitle, isDark && styles.textLight]}>Health Management</Text>
+        
+        <MenuItem 
+          title="Daily Tracker" 
+          icon="pulse" 
+          color="#3498db" 
+          route="/tracker"
+          desc="Log BP, Steps, and Food"
+        />
+        
+        <MenuItem 
+          title="My Medications" 
+          icon="medkit" 
+          color="#8e44ad" 
+          route="/medications" 
+          desc="Pill reminders & list"
+        />
+
+        <MenuItem 
+          title="Health Assistant" 
+          icon="chatbubbles" 
+          color="#f1c40f" 
+          route="/chat"
+          desc="Ask AI about symptoms"
+        />
+        
+        <MenuItem 
+          title="Heart Education" 
+          icon="school" 
+          color="#27ae60" 
+          route="/learn" 
+          desc="Tips & Mini-Game"
+        />
+      </View>
+
+      {/* EMERGENCY SECTION */}
+      <View style={styles.bottomSection}>
+         <MenuItem 
+          title="Emergency Info" 
+          icon="warning" 
+          color="#c0392b" 
+          route="/emergency"
+          desc="Hypertensive Crisis Guide"
+        />
       </View>
 
     </ScrollView>
@@ -75,6 +130,26 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, padding: 20, paddingTop: 60, backgroundColor: '#f8f9fa' },
+  containerDark: { backgroundColor: '#121212' },
+  
+  // Text Styles
+  textLight: { color: '#ffffff' },
+  textGray: { color: '#aaaaaa' },
+
+  // Branding
+  brandingHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 20, 
+    opacity: 0.8 
+  },
+  logoBadge: { 
+    width: 24, height: 24, borderRadius: 6, backgroundColor: '#3498db', 
+    alignItems: 'center', justifyContent: 'center', marginRight: 8 
+  },
+  brandingText: { fontWeight: 'bold', fontSize: 14, color: '#333', letterSpacing: 1 },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -82,20 +157,28 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   greeting: { fontSize: 18, color: '#7f8c8d' },
-  username: { fontSize: 28, fontWeight: 'bold', color: '#2c3e50' },
+  username: { fontSize: 32, fontWeight: 'bold', color: '#2c3e50' },
   profileBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    width: 50, height: 50, borderRadius: 25, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
   },
+  profileBtnDark: { backgroundColor: '#333' },
+
+  // Insight Card
+  insightCard: {
+    backgroundColor: '#3498db',
+    padding: 20,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 40, // Increased spacing below card
+  },
+  insightContent: { marginLeft: 15, flex: 1 },
+  insightTitle: { fontSize: 18, fontWeight: 'bold', color: 'white' },
+  insightText: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 5 },
+
+  // Menu
   sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 15 },
   menuContainer: { gap: 15, marginBottom: 30 },
   menuItem: {
@@ -104,32 +187,17 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
   },
+  menuItemDark: { backgroundColor: '#1e1e1e' },
+  
   iconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 15,
+    width: 50, height: 50, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', marginRight: 15,
   },
   menuText: { flex: 1 },
   menuTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   menuDesc: { fontSize: 13, color: '#999', marginTop: 2 },
-  
-  insightCard: {
-    backgroundColor: '#3498db',
-    padding: 20,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  insightContent: { marginLeft: 15, flex: 1 },
-  insightTitle: { fontSize: 18, fontWeight: 'bold', color: 'white' },
-  insightText: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 5 },
+
+  bottomSection: { marginBottom: 40 },
 });

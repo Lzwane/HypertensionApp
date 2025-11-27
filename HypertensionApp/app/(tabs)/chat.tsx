@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Keyboard, ActivityIndicator, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getAIResponse } from '../services/ai'; // Import our new AI service
 
 interface Message {
   id: string;
@@ -10,24 +11,25 @@ interface Message {
 
 export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   const [messages, setMessages] = useState<Message[]>([
     { 
       id: '1', 
-      text: 'Hello! I am your health assistant. How is your blood pressure today?', 
+      text: 'Hello! I am your JB LABS health assistant. How can I help with your hypertension today?', 
       sender: 'ai' 
     }
   ]);
   
-  // Auto-scroll to bottom when new message arrives
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (inputText.trim() === '') return;
 
     // 1. Add User Message
@@ -35,33 +37,25 @@ export default function ChatScreen() {
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
     Keyboard.dismiss();
+    setIsLoading(true);
 
-    // 2. Simulate AI Response (Simple Logic for now)
-    setTimeout(() => {
-      let aiText = "I see. Remember to take your medication and stay hydrated.";
-      
-      const lowerInput = userMsg.text.toLowerCase();
-      if (lowerInput.includes('high')) {
-        aiText = "If your reading is high, please sit quietly for 5 minutes and re-test. If it remains over 180/120, contact a doctor immediately.";
-      } else if (lowerInput.includes('headache') || lowerInput.includes('dizzy')) {
-        aiText = "Dizziness or headaches can be symptoms of BP changes. Please check your reading now.";
-      } else if (lowerInput.includes('food') || lowerInput.includes('eat')) {
-        aiText = "Try to avoid salty foods. Fruits and vegetables are great for keeping BP stable!";
-      }
+    // 2. Call REAL AI
+    // If you haven't set an API key in services/ai.ts, this will fail gracefully.
+    const aiResponseText = await getAIResponse(userMsg.text);
 
-      const aiMsg: Message = { id: (Date.now() + 1).toString(), text: aiText, sender: 'ai' };
-      setMessages(prev => [...prev, aiMsg]);
-    }, 1000);
+    const aiMsg: Message = { id: (Date.now() + 1).toString(), text: aiResponseText, sender: 'ai' };
+    setMessages(prev => [...prev, aiMsg]);
+    setIsLoading(false);
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
     <View style={[
       styles.messageBubble, 
-      item.sender === 'user' ? styles.userBubble : styles.aiBubble
+      item.sender === 'user' ? styles.userBubble : (isDark ? styles.aiBubbleDark : styles.aiBubble)
     ]}>
       <Text style={[
         styles.messageText, 
-        item.sender === 'user' ? styles.userText : styles.aiText
+        item.sender === 'user' ? styles.userText : (isDark ? styles.aiTextDark : styles.aiText)
       ]}>
         {item.text}
       </Text>
@@ -69,9 +63,9 @@ export default function ChatScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Health Assistant</Text>
+    <View style={[styles.container, isDark && styles.containerDark]}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
+        <Text style={[styles.headerTitle, isDark && styles.textLight]}>JB LABS Assistant</Text>
       </View>
 
       <FlatList
@@ -82,13 +76,20 @@ export default function ChatScreen() {
         contentContainerStyle={styles.listContent}
       />
 
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#3498db" />
+          <Text style={[styles.loadingText, isDark && styles.textGray]}>Thinking...</Text>
+        </View>
+      )}
+
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"} 
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-        style={styles.inputContainer}
+        style={[styles.inputContainer, isDark && styles.inputContainerDark]}
       >
         <TextInput
-          style={styles.input}
+          style={[styles.input, isDark && styles.inputDark]}
           value={inputText}
           onChangeText={setInputText}
           placeholder="Type a message..."
@@ -104,60 +105,43 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
+  containerDark: { backgroundColor: '#121212' },
+  
   header: {
-    paddingTop: 50,
-    paddingBottom: 15,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingTop: 50, paddingBottom: 15, backgroundColor: 'white', alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: '#eee',
   },
+  headerDark: { backgroundColor: '#1e1e1e', borderBottomColor: '#333' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  textLight: { color: 'white' },
+  textGray: { color: '#aaa' },
+
   listContent: { padding: 15, paddingBottom: 20 },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 20,
-    marginBottom: 10,
-    maxWidth: '80%',
-  },
-  userBubble: {
-    backgroundColor: '#3498db',
-    alignSelf: 'flex-end',
-    borderBottomRightRadius: 2,
-  },
-  aiBubble: {
-    backgroundColor: 'white',
-    alignSelf: 'flex-start',
-    borderBottomLeftRadius: 2,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
+  messageBubble: { padding: 12, borderRadius: 20, marginBottom: 10, maxWidth: '80%' },
+  
+  userBubble: { backgroundColor: '#3498db', alignSelf: 'flex-end', borderBottomRightRadius: 2 },
+  aiBubble: { backgroundColor: 'white', alignSelf: 'flex-start', borderBottomLeftRadius: 2, borderWidth: 1, borderColor: '#eee' },
+  aiBubbleDark: { backgroundColor: '#2c2c2c', alignSelf: 'flex-start', borderBottomLeftRadius: 2, borderWidth: 1, borderColor: '#333' },
+  
   messageText: { fontSize: 16 },
   userText: { color: 'white' },
   aiText: { color: '#333' },
+  aiTextDark: { color: '#eee' },
+
+  loadingContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 20, marginBottom: 10 },
+  loadingText: { marginLeft: 10, color: '#666', fontStyle: 'italic' },
+
   inputContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingBottom: 30, // Extra padding for iPhone bottom bar
+    flexDirection: 'row', padding: 10, backgroundColor: 'white', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: '#eee', paddingBottom: 30,
   },
+  inputContainerDark: { backgroundColor: '#1e1e1e', borderTopColor: '#333' },
+  
   input: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    fontSize: 16,
-    marginRight: 10,
+    flex: 1, backgroundColor: '#f0f0f0', borderRadius: 20, paddingHorizontal: 15,
+    paddingVertical: 10, fontSize: 16, marginRight: 10,
   },
-  sendButton: {
-    backgroundColor: '#3498db',
-    padding: 10,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  inputDark: { backgroundColor: '#333', color: 'white' },
+  
+  sendButton: { backgroundColor: '#3498db', padding: 10, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
 });
