@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView,
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { db } from './services/firebaseConfig'; // Import Firebase
+import { db } from './services/firebaseConfig'; // Correct path from app/profile.tsx to app/services/
 import { collection, addDoc } from 'firebase/firestore'; 
 
 export default function ProfileScreen() {

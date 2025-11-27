@@ -18,7 +18,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([
     { 
       id: '1', 
-      text: 'Hello! I am your JG LABS health assistant. How can I help with your hypertension today?', 
+      text: 'Hello! I am your JB LABS health assistant. How can I help with your hypertension today?', 
       sender: 'ai' 
     }
   ]);
@@ -48,24 +48,28 @@ export default function ChatScreen() {
     setIsLoading(false);
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[
-      styles.messageBubble, 
-      item.sender === 'user' ? styles.userBubble : (isDark ? styles.aiBubbleDark : styles.aiBubble)
-    ]}>
-      <Text style={[
-        styles.messageText, 
-        item.sender === 'user' ? styles.userText : (isDark ? styles.aiTextDark : styles.aiText)
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isUser = item.sender === 'user';
+    
+    return (
+      <View style={[
+        styles.messageBubble, 
+        isUser ? styles.userBubble : (isDark ? styles.aiBubbleDark : styles.aiBubble)
       ]}>
-        {item.text}
-      </Text>
-    </View>
-  );
+        <Text style={[
+          styles.messageText, 
+          isUser ? styles.userText : (isDark ? styles.aiTextDark : styles.aiText)
+        ]}>
+          {item.text}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
       <View style={[styles.header, isDark && styles.headerDark]}>
-        <Text style={[styles.headerTitle, isDark && styles.textLight]}>JG LABS Assistant</Text>
+        <Text style={[styles.headerTitle, isDark && styles.textLight]}>JB LABS Assistant</Text>
       </View>
 
       <FlatList
