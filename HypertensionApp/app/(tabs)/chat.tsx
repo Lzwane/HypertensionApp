@@ -18,7 +18,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([
     { 
       id: '1', 
-      text: 'Hello! I am your JB LABS health assistant. How can I help with your hypertension today?', 
+      text: 'Hello! I am your JG LABS health assistant. How can I help with your hypertension today?', 
       sender: 'ai' 
     }
   ]);
@@ -65,7 +65,7 @@ export default function ChatScreen() {
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
       <View style={[styles.header, isDark && styles.headerDark]}>
-        <Text style={[styles.headerTitle, isDark && styles.textLight]}>JB LABS Assistant</Text>
+        <Text style={[styles.headerTitle, isDark && styles.textLight]}>JG LABS Assistant</Text>
       </View>
 
       <FlatList
