@@ -40,7 +40,6 @@ export default function ChatScreen() {
     setIsLoading(true);
 
     // 2. Call REAL AI
-    // If you haven't set an API key in services/ai.ts, this will fail gracefully.
     const aiResponseText = await getAIResponse(userMsg.text);
 
     const aiMsg: Message = { id: (Date.now() + 1).toString(), text: aiResponseText, sender: 'ai' };
@@ -50,7 +49,6 @@ export default function ChatScreen() {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.sender === 'user';
-    
     return (
       <View style={[
         styles.messageBubble, 
@@ -83,7 +81,7 @@ export default function ChatScreen() {
       {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color="#3498db" />
-          <Text style={[styles.loadingText, isDark && styles.textGray]}>Thinking...</Text>
+          <Text style={[styles.loadingText, isDark ? styles.textGray : styles.textLoading]}>Thinking...</Text>
         </View>
       )}
 
@@ -119,6 +117,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   textLight: { color: 'white' },
   textGray: { color: '#aaa' },
+  textLoading: { color: '#666' },
 
   listContent: { padding: 15, paddingBottom: 20 },
   messageBubble: { padding: 12, borderRadius: 20, marginBottom: 10, maxWidth: '80%' },
@@ -133,7 +132,7 @@ const styles = StyleSheet.create({
   aiTextDark: { color: '#eee' },
 
   loadingContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 20, marginBottom: 10 },
-  loadingText: { marginLeft: 10, color: '#666', fontStyle: 'italic' },
+  loadingText: { marginLeft: 10, fontStyle: 'italic' },
 
   inputContainer: {
     flexDirection: 'row', padding: 10, backgroundColor: 'white', alignItems: 'center',

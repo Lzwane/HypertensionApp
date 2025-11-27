@@ -1,30 +1,43 @@
-// REPLACE WITH YOUR OPENAI KEY (platform.openai.com)
-const OPENAI_API_KEY = 'YOUR_OPENAI_KEY_HERE'; 
+// ⚠️ REPLACE WITH YOUR GEMINI API KEY FROM https://aistudio.google.com/app/apikey
+const GEMINI_API_KEY = "AIzaSyBtOvYjz0Og39FHdPNuW_pBBzXMQFW2Opg"; 
 
 export const getAIResponse = async (userMessage: string) => {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo", // or "gpt-4" if you have access
-        messages: [
-          { role: "system", content: "You are an empathetic medical assistant helping a patient manage hypertension. Be brief, encouraging, and clear." },
-          { role: "user", content: userMessage }
-        ],
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `You are a helpful medical assistant for hypertension. Keep answers short (max 3 sentences). User asks: ${userMessage}`
+            }]
+          }]
+        }),
+      }
+    );
 
-    const data = await response.json();
-    if (data.choices && data.choices.length > 0) {
-      return data.choices[0].message.content.trim();
+    const result = await response.json();
+
+    if (result.error) {
+      console.error("Gemini Error:", result.error);
+      return "I'm having trouble thinking right now. Please check your API key.";
     }
-    return "I'm having trouble connecting to my brain right now. Please try again.";
+
+    if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return result.candidates[0].content.parts[0].text.trim();
+    }
+
+    return "I didn't understand that.";
+
   } catch (error) {
-    console.error("AI Error:", error);
-    return "Network error. Please check your internet connection.";
+    console.error("Network Error:", error);
+    return "Please check your internet connection.";
   }
 };
+
+// Export default to prevent Expo Router warning
+export default {};
