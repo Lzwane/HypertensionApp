@@ -1,4 +1,4 @@
-const GEMINI_API_KEY = "AIzaSyCy3QVu_GYno70bOZTS5jre5zKmpOP7Sks"; 
+const GEMINI_API_KEY = API_KEY; 
 
 const MODEL_NAME = "gemini-2.5-flash";
 
