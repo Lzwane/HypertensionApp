@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Switch } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function AddMedScreen() {
   const router = useRouter();
@@ -10,9 +11,11 @@ export default function AddMedScreen() {
   const [dosage, setDosage] = useState('');
   const [instructions, setInstructions] = useState('');
   const [reminderEnabled, setReminderEnabled] = useState(false);
+  
+  const [reminderTime, setReminderTime] = useState(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
-  // Helper: Request Permission and Schedule
-  const scheduleNotification = async (medName: string) => {
+  const scheduleNotification = async (medName: string, time: Date) => {
     // 1. Check/Request Permission
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
@@ -21,7 +24,6 @@ export default function AddMedScreen() {
     }
 
     // 2. Schedule the Notification
-    // FIX: We explicitly define the trigger type as 'TIME_INTERVAL'
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: "Medication Reminder",
@@ -29,13 +31,24 @@ export default function AddMedScreen() {
         sound: true,
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 10, // Fires 10 seconds after saving (for testing)
-        repeats: false,
+        // FIX: Explicitly set the type to DAILY
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: time.getHours(),
+        minute: time.getMinutes(),
       },
     });
 
     return identifier;
+  };
+
+  const handleTimeChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    
+    if (selectedDate) {
+      setReminderTime(selectedDate);
+    }
   };
 
   const handleSave = async () => {
@@ -47,9 +60,8 @@ export default function AddMedScreen() {
     try {
       let notificationId = null;
 
-      // If user wants reminders, schedule one
       if (reminderEnabled) {
-        notificationId = await scheduleNotification(name);
+        notificationId = await scheduleNotification(name, reminderTime);
       }
 
       const newMed = {
@@ -58,6 +70,7 @@ export default function AddMedScreen() {
         dosage,
         instructions,
         reminder: reminderEnabled,
+        reminderTime: reminderEnabled ? reminderTime.toISOString() : null,
         notificationId,
       };
 
@@ -67,7 +80,8 @@ export default function AddMedScreen() {
       meds.push(newMed);
       await AsyncStorage.setItem('medications', JSON.stringify(meds));
 
-      Alert.alert('Success', 'Medication added! (Reminder set for 10s from now)');
+      const timeString = reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      Alert.alert('Success', `Medication added! ${reminderEnabled ? `(Reminder set for ${timeString})` : ''}`);
       router.back(); 
     } catch (error) {
       Alert.alert('Error', 'Could not save data');
@@ -118,6 +132,30 @@ export default function AddMedScreen() {
         />
       </View>
 
+      {reminderEnabled && (
+        <View style={styles.timeSection}>
+          <Text style={styles.label}>Notification Time</Text>
+          
+          {Platform.OS === 'android' && (
+            <TouchableOpacity style={styles.timeButton} onPress={() => setShowTimePicker(true)}>
+              <Text style={styles.timeButtonText}>
+                {reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {(showTimePicker || Platform.OS === 'ios') && (
+            <DateTimePicker
+              value={reminderTime}
+              mode="time"
+              display="default"
+              onChange={handleTimeChange}
+              style={styles.datePicker}
+            />
+          )}
+        </View>
+      )}
+
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Medication</Text>
       </TouchableOpacity>
@@ -133,7 +171,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, paddingTop: 60, backgroundColor: '#fff' },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 30, textAlign: 'center' },
   inputGroup: { marginBottom: 20 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   label: { fontSize: 16, marginBottom: 8, color: '#333' },
   input: {
     borderWidth: 1,
@@ -157,4 +195,24 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   cancelButtonText: { color: '#e74c3c', fontSize: 16 },
+  timeSection: {
+    marginBottom: 30,
+    alignItems: Platform.OS === 'ios' ? 'flex-start' : 'stretch',
+  },
+  timeButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  timeButtonText: {
+    fontSize: 18,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  datePicker: {
+    marginTop: 5,
+  }
 });

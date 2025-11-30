@@ -23,6 +23,14 @@ export default function HomeScreen() {
     } catch (e) { console.log(e); }
   };
 
+  // Helper function to get time-sensitive greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning,";
+    if (hour < 17) return "Good Afternoon,"; // Before 5 PM
+    return "Good Evening,";
+  };
+
   const MenuItem = ({ title, icon, color, route, desc }: any) => (
     <TouchableOpacity 
       style={[styles.menuItem, isDark && styles.menuItemDark]} 
@@ -54,7 +62,7 @@ export default function HomeScreen() {
       {/* USER GREETING */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Good Morning,</Text>
+          <Text style={styles.greeting}>{getGreeting()}</Text>
           <Text style={[styles.username, isDark && styles.textLight]}>{userName}</Text>
         </View>
         <TouchableOpacity 
@@ -76,7 +84,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* MAIN ACTIONS - Pushed down with marginTop */}
+      {/* MAIN ACTIONS */}
       <View style={styles.menuContainer}>
         <Text style={[styles.sectionTitle, isDark && styles.textLight]}>Health Management</Text>
         
@@ -94,6 +102,24 @@ export default function HomeScreen() {
           color="#8e44ad" 
           route="/medications" 
           desc="Pill reminders & list"
+        />
+
+        {/* NEW: Doctor Report Section */}
+        <MenuItem 
+          title="Doctor Report" 
+          icon="document-text" 
+          color="#e67e22" 
+          route="/report" 
+          desc="Share summary via WhatsApp/Email"
+        />
+
+        {/* NEW: Pharmacy Finder Section */}
+        <MenuItem 
+          title="Find Pharmacy" 
+          icon="location" 
+          color="#16a085" 
+          route="/pharmacy" 
+          desc="Locate nearest refills"
         />
 
         <MenuItem 
@@ -172,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 40, // Increased spacing below card
+    marginBottom: 40, 
   },
   insightContent: { marginLeft: 15, flex: 1 },
   insightTitle: { fontSize: 18, fontWeight: 'bold', color: 'white' },
