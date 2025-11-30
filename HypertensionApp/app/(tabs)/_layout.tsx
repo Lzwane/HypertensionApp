@@ -46,7 +46,16 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 4. Education */}
+      {/* 4. Journal (NEW) */}
+      <Tabs.Screen
+        name="journal"
+        options={{
+          title: 'Journal',
+          tabBarIcon: ({ color }) => <Ionicons name="journal" size={24} color={color} />,
+        }}
+      />
+
+      {/* 5. Education */}
       <Tabs.Screen
         name="learn"
         options={{
@@ -55,7 +64,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 5. AI Chat */}
+      {/* 6. AI Chat */}
       <Tabs.Screen
         name="chat"
         options={{
