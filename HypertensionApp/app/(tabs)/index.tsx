@@ -52,7 +52,7 @@ export default function HomeScreen() {
         <View style={styles.logoBadge}>
           <Ionicons name="flask" size={16} color="white" />
         </View>
-        <Text style={[styles.brandingText, isDark && styles.textLight]}>JG LABS</Text>
+        <Text style={[styles.brandingText, isDark && styles.textLight]}>Syscare.ng</Text>
       </View>
 
       {/* USER GREETING */}

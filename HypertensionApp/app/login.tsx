@@ -37,7 +37,7 @@ export default function LoginScreen() {
           <View style={styles.logoBadge}>
             <Ionicons name="flask" size={40} color="white" />
           </View>
-          <Text style={styles.appName}>JG LABS</Text>
+          <Text style={styles.appName}>Syscare.ng</Text>
           <Text style={styles.tagline}>Hypertension Manager</Text>
         </View>
 

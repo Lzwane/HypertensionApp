@@ -82,7 +82,7 @@ export default function SignUpScreen() {
            <View style={styles.logoBadge}>
               <Ionicons name="flask" size={24} color="white" />
            </View>
-           <Text style={styles.appName}>JG LABS</Text>
+           <Text style={styles.appName}>Syscare.ng</Text>
         </View>
 
         <View style={styles.formContainer}>
