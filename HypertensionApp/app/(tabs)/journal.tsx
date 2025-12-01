@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Alert, useColorScheme } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+// Firebase Imports
+import { collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../services/firebaseConfig';
 
 interface JournalEntry {
-  id: number;
+  id: string;
   text: string;
   date: string;
 }
@@ -20,37 +22,55 @@ export default function JournalScreen() {
   }, []);
 
   const loadJournal = async () => {
+    if (!auth.currentUser) return;
+
     try {
-      const data = await AsyncStorage.getItem('user_journal');
-      if (data) setEntries(JSON.parse(data));
+      const q = query(
+        collection(db, 'journal'),
+        where('userId', '==', auth.currentUser.uid),
+        orderBy('date', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const loadedEntries: JournalEntry[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedEntries.push({ id: doc.id, ...doc.data() } as JournalEntry);
+      });
+      
+      setEntries(loadedEntries);
     } catch (e) {
-      console.log('Failed to load journal');
+      console.log('Failed to load journal', e);
     }
   };
 
   const handleSave = async () => {
     if (!text.trim()) return;
+    if (!auth.currentUser) return;
 
-    const newEntry: JournalEntry = {
-      id: Date.now(),
-      text: text.trim(),
-      date: new Date().toISOString(),
-    };
-
-    const updatedEntries = [newEntry, ...entries];
-    setEntries(updatedEntries);
-    await AsyncStorage.setItem('user_journal', JSON.stringify(updatedEntries));
-    setText('');
+    try {
+      await addDoc(collection(db, 'journal'), {
+        userId: auth.currentUser.uid,
+        text: text.trim(),
+        date: new Date().toISOString(),
+      });
+      setText('');
+      loadJournal(); // Refresh
+    } catch (e) {
+      Alert.alert('Error', 'Could not save entry');
+    }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     Alert.alert("Delete Entry", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete", style: "destructive", onPress: async () => {
-          const updated = entries.filter(e => e.id !== id);
-          setEntries(updated);
-          await AsyncStorage.setItem('user_journal', JSON.stringify(updated));
+          try {
+            await deleteDoc(doc(db, 'journal', id));
+            loadJournal();
+          } catch (e) {
+            Alert.alert('Error', 'Could not delete entry');
+          }
         }
       }
     ]);
@@ -65,7 +85,7 @@ export default function JournalScreen() {
 
       <FlatList
         data={entries}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <View style={[styles.card, isDark && styles.cardDark]}>
             <View style={styles.cardHeader}>

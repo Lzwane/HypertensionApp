@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Share, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+// Firebase
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db, auth } from './services/firebaseConfig';
 
 export default function ReportScreen() {
   const router = useRouter();
@@ -15,57 +17,70 @@ export default function ReportScreen() {
 
   const generateReport = async () => {
     try {
-      // 1. Gather all data
-      const bpData = await AsyncStorage.getItem('bp_readings');
-      const medData = await AsyncStorage.getItem('medications');
-      const foodData = await AsyncStorage.getItem('food_logs');
-
-      const readings = bpData ? JSON.parse(bpData) : [];
-      const meds = medData ? JSON.parse(medData) : [];
-      const foods = foodData ? JSON.parse(foodData) : [];
-
-      // 2. Build the Report String
-      let report = `HEALTH REPORT - ${new Date().toDateString()}\n\n`;
-
-      // -- BP Section
-      report += `--- BLOOD PRESSURE LOG ---\n`;
-      if (readings.length > 0) {
-        // Take last 5 readings
-        readings.slice(0, 5).forEach((r: any) => {
-          report += `${r.systolic}/${r.diastolic} mmHg - ${new Date(r.date).toLocaleDateString()}\n`;
-        });
-      } else {
-        report += `No readings recorded.\n`;
+      if (!auth.currentUser) {
+        setReportText("Please log in to view your report.");
+        setLoading(false);
+        return;
       }
+
+      const uid = auth.currentUser.uid;
+
+      // 1. Fetch BP History (Last 10)
+      const bpQ = query(collection(db, 'bp_readings'), where('userId', '==', uid), orderBy('date', 'desc'), limit(10));
+      const bpSnap = await getDocs(bpQ);
+
+      // 2. Fetch Meds
+      const medQ = query(collection(db, 'medications'), where('userId', '==', uid));
+      const medSnap = await getDocs(medQ);
+
+      // 3. Fetch Food (Last 5)
+      const foodQ = query(collection(db, 'food_logs'), where('userId', '==', uid), orderBy('date', 'desc'), limit(5));
+      const foodSnap = await getDocs(foodQ);
+
+      // 4. Fetch Symptoms (Last 5)
+      const symQ = query(collection(db, 'symptoms'), where('userId', '==', uid), orderBy('date', 'desc'), limit(5));
+      const symSnap = await getDocs(symQ);
+
+      // --- Build String ---
+      let report = `HEALTH REPORT\nPatient: ${auth.currentUser.displayName || 'User'}\nDate: ${new Date().toDateString()}\n\n`;
+
+      report += `=== BLOOD PRESSURE LOG (Last 10) ===\n`;
+      if (bpSnap.empty) report += `No readings recorded.\n`;
+      bpSnap.forEach(doc => {
+        const d = doc.data();
+        report += `${d.systolic}/${d.diastolic} mmHg - ${new Date(d.date).toLocaleDateString()}\n`;
+      });
       report += `\n`;
 
-      // -- Meds Section
-      report += `--- CURRENT MEDICATIONS ---\n`;
-      if (meds.length > 0) {
-        meds.forEach((m: any) => {
-          report += `- ${m.name} (${m.dosage}): ${m.instructions}\n`;
-        });
-      } else {
-        report += `No medications listed.\n`;
-      }
+      report += `=== MEDICATIONS ===\n`;
+      if (medSnap.empty) report += `No medications listed.\n`;
+      medSnap.forEach(doc => {
+        const d = doc.data();
+        report += `- ${d.name} (${d.dosage}): ${d.instructions}\n`;
+      });
       report += `\n`;
 
-      // -- Food Section
-      report += `--- RECENT MEALS ---\n`;
-      if (foods.length > 0) {
-        foods.slice(0, 3).forEach((f: any) => {
-          report += `- ${f.meal} (${f.description})\n`;
-        });
-      } else {
-        report += `No meals logged.\n`;
-      }
+      report += `=== RECENT SYMPTOMS ===\n`;
+      if (symSnap.empty) report += `No symptoms reported.\n`;
+      symSnap.forEach(doc => {
+        const d = doc.data();
+        report += `- ${d.symptom} (Severity: ${d.severity}/5) - ${new Date(d.date).toLocaleDateString()}\n`;
+      });
+      report += `\n`;
+
+      report += `=== FOOD DIARY (Last 5 Meals) ===\n`;
+      if (foodSnap.empty) report += `No meals logged.\n`;
+      foodSnap.forEach(doc => {
+        const d = doc.data();
+        report += `- ${d.meal} (${d.description})\n`;
+      });
 
       setReportText(report);
       setLoading(false);
 
     } catch (error) {
       console.error(error);
-      setReportText('Error generating report.');
+      setReportText('Error generating report. Please try again.');
       setLoading(false);
     }
   };
@@ -88,6 +103,9 @@ export default function ReportScreen() {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Health Summary</Text>
+        <TouchableOpacity onPress={generateReport} style={styles.refreshButton}>
+          <Ionicons name="refresh" size={24} color="#3498db" />
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.description}>
@@ -119,9 +137,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 10,
+    justifyContent: 'space-between',
   },
   backButton: { padding: 5 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', marginLeft: 15, color: '#333' },
+  refreshButton: { padding: 5 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   description: { paddingHorizontal: 20, color: '#666', marginBottom: 20 },
   
   previewContainer: {
@@ -139,9 +159,9 @@ const styles = StyleSheet.create({
   },
   reportText: {
     fontFamily: 'Courier', // Monospace font looks more like a document
-    fontSize: 14,
+    fontSize: 13,
     color: '#333',
-    lineHeight: 22,
+    lineHeight: 20,
   },
   
   footer: {

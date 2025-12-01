@@ -1,127 +1,161 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { getDailyTipAI } from '../services/ai';
 
 export default function LearnScreen() {
   const router = useRouter();
+  const [dailyTip, setDailyTip] = useState('');
+  const [loadingTip, setLoadingTip] = useState(true);
 
-  const tips = [
-    { title: "Reduce Sodium", desc: "Aim for less than 2,300mg of sodium per day." },
-    { title: "Move More", desc: "Just 30 mins of walking can lower your BP significantly." },
-    { title: "Limit Caffeine", desc: "Caffeine can cause a short, but dramatic BP spike." },
-  ];
+  useEffect(() => {
+    initializeDailyFeatures();
+  }, []);
+
+  const initializeDailyFeatures = async () => {
+    await checkDailyTip();
+    await scheduleDailyNotification();
+  };
+
+  // 1. Daily Tip Logic
+  const checkDailyTip = async () => {
+    try {
+      const today = new Date().toDateString();
+      const storedDate = await AsyncStorage.getItem('tip_date');
+      const storedTip = await AsyncStorage.getItem('daily_tip');
+
+      if (storedDate === today && storedTip) {
+        setDailyTip(storedTip);
+        setLoadingTip(false);
+      } else {
+        // Fetch new tip from AI
+        const newTip = await getDailyTipAI();
+        setDailyTip(newTip);
+        await AsyncStorage.setItem('tip_date', today);
+        await AsyncStorage.setItem('daily_tip', newTip);
+        setLoadingTip(false);
+      }
+    } catch (e) {
+      console.log(e);
+      setDailyTip("Eat more vegetables today!");
+      setLoadingTip(false);
+    }
+  };
+
+  // 2. Notification Logic
+  const scheduleDailyNotification = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') return;
+
+    // Check if already scheduled to avoid duplicates
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const hasDailyTip = scheduled.some(n => n.content.title === "💡 New Daily Tip");
+
+    if (!hasDailyTip) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "💡 New Daily Tip",
+          body: "Your new hypertension health tip is ready. Check it out!",
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 9, // 9:00 AM every day
+          minute: 0,
+        },
+      });
+    }
+  };
+
+  const refreshTip = async () => {
+    setLoadingTip(true);
+    const newTip = await getDailyTipAI();
+    setDailyTip(newTip);
+    // Update storage so it persists for the rest of the day
+    await AsyncStorage.setItem('daily_tip', newTip);
+    setLoadingTip(false);
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>Heart Health</Text>
+      <Text style={styles.header}>Learn & Play</Text>
 
-      {/* Game Card */}
-      <View style={styles.gameCard}>
-        <View style={styles.gameContent}>
-          <Text style={styles.gameTitle}>BP Master Quiz</Text>
-          <Text style={styles.gameDesc}>Test your knowledge and earn a high score!</Text>
-          <TouchableOpacity 
-            style={styles.playButton} 
-            onPress={() => router.push('/quiz')}
-          >
-            <Text style={styles.playButtonText}>Play Now</Text>
-            <Ionicons name="play-circle" size={20} color="white" style={{marginLeft: 5}}/>
+      {/* DAILY TIP CARD */}
+      <View style={styles.tipCard}>
+        <View style={styles.tipHeader}>
+          <Ionicons name="bulb" size={24} color="#f1c40f" />
+          <Text style={styles.tipTitle}>Tip of the Day</Text>
+          <TouchableOpacity onPress={refreshTip}>
+            <Ionicons name="refresh" size={20} color="white" />
           </TouchableOpacity>
         </View>
-        <Ionicons name="game-controller" size={80} color="rgba(255,255,255,0.2)" style={styles.gameIcon} />
+        {loadingTip ? (
+          <ActivityIndicator color="white" style={{ marginTop: 10 }} />
+        ) : (
+          <Text style={styles.tipText}>"{dailyTip}"</Text>
+        )}
       </View>
 
-      <Text style={styles.sectionTitle}>Daily Tips</Text>
-      
-      {tips.map((tip, index) => (
-        <View key={index} style={styles.tipCard}>
-          <View style={styles.tipIcon}>
-            <Ionicons name="bulb" size={24} color="#f1c40f" />
-          </View>
-          <View style={{flex: 1}}>
-            <Text style={styles.tipTitle}>{tip.title}</Text>
-            <Text style={styles.tipDesc}>{tip.desc}</Text>
-          </View>
+      <Text style={styles.sectionTitle}>Mini Games</Text>
+
+      {/* GAME 1: AI QUIZ */}
+      <TouchableOpacity style={styles.gameCard} onPress={() => router.push('/quiz')}>
+        <View style={[styles.iconBox, { backgroundColor: '#3498db' }]}>
+          <Ionicons name="school" size={32} color="white" />
         </View>
-      ))}
+        <View style={styles.gameContent}>
+          <Text style={styles.gameTitle}>BP Master Quiz</Text>
+          <Text style={styles.gameDesc}>AI-generated questions to test your knowledge.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#ccc" />
+      </TouchableOpacity>
 
-      <View style={styles.infoBox}>
-        <Ionicons name="information-circle" size={24} color="#2980b9" />
-        <Text style={styles.infoText}>
-          Hypertension is often called the "Silent Killer" because it often has no warning signs. Regular testing is key.
-        </Text>
-      </View>
+      {/* GAME 2: SODIUM SORTER */}
+      <TouchableOpacity style={styles.gameCard} onPress={() => router.push('/sodium-game')}>
+        <View style={[styles.iconBox, { backgroundColor: '#e67e22' }]}>
+          <Ionicons name="nutrition" size={32} color="white" />
+        </View>
+        <View style={styles.gameContent}>
+          <Text style={styles.gameTitle}>Sodium Sorter</Text>
+          <Text style={styles.gameDesc}>Swipe or tap: Is this food High or Low sodium?</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#ccc" />
+      </TouchableOpacity>
 
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, backgroundColor: '#f5f5f5' },
+  container: { flexGrow: 1, padding: 20, paddingTop: 60, backgroundColor: '#f8f9fa' },
   header: { fontSize: 28, fontWeight: 'bold', marginBottom: 20, color: '#333' },
   
-  // Game Card Styles
-  gameCard: {
-    backgroundColor: '#e67e22',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 30,
-    height: 160,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#e67e22',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  gameContent: { flex: 1, zIndex: 1 },
-  gameTitle: { color: 'white', fontSize: 24, fontWeight: 'bold' },
-  gameDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginVertical: 8 },
-  gameIcon: { position: 'absolute', right: -10, bottom: -10 },
-  playButton: {
-    backgroundColor: 'white',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  playButtonText: { color: '#e67e22', fontWeight: 'bold' },
-
-  sectionTitle: { fontSize: 20, fontWeight: '600', marginBottom: 15, color: '#333' },
-  
   tipCard: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tipIcon: {
-    width: 40,
-    height: 40,
+    backgroundColor: '#8e44ad',
+    padding: 20,
     borderRadius: 20,
-    backgroundColor: '#fff9c4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 15,
+    marginBottom: 30,
+    shadowColor: '#8e44ad', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5,
   },
-  tipTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  tipDesc: { fontSize: 14, color: '#666', marginTop: 2 },
+  tipHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  tipTitle: { color: 'white', fontWeight: 'bold', fontSize: 18, flex: 1, marginLeft: 10 },
+  tipText: { color: 'white', fontSize: 16, lineHeight: 24, fontStyle: 'italic' },
 
-  infoBox: {
-    marginTop: 20,
-    backgroundColor: '#e1f5fe',
-    padding: 15,
-    borderRadius: 10,
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, color: '#333' },
+
+  gameCard: {
+    backgroundColor: 'white',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 15,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 3,
   },
-  infoText: { flex: 1, color: '#2980b9', fontStyle: 'italic' },
+  iconBox: { width: 60, height: 60, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  gameContent: { flex: 1 },
+  gameTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  gameDesc: { fontSize: 13, color: '#7f8c8d', marginTop: 4 },
 });

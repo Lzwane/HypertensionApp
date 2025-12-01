@@ -1,20 +1,30 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useColorScheme, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useColorScheme, StatusBar, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSession } from '../ctx'; // Import session hook
+import { useSession } from '../ctx'; 
+import { signOut } from 'firebase/auth'; // Import signOut
+import { auth } from '../services/firebaseConfig'; // Import auth object
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { userName, signOut } = useSession(); // Get name and signOut function
+  const { user } = useSession(); // Get the real Firebase User
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  // Helper function to get time-sensitive greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning,";
     if (hour < 17) return "Good Afternoon,";
     return "Good Evening,";
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      // The _layout.tsx will handle the redirection to login automatically
+    } catch (error) {
+      Alert.alert("Error", "Failed to sign out");
+    }
   };
 
   const MenuItem = ({ title, icon, color, route, desc }: any) => (
@@ -50,14 +60,14 @@ export default function HomeScreen() {
         <View>
           <Text style={styles.greeting}>{getGreeting()}</Text>
           <Text style={[styles.username, isDark && styles.textLight]}>
-            {userName || 'User'}
+            {user?.displayName || 'User'} 
           </Text>
         </View>
         
-        {/* Logout Button (Small tweak to profile button behavior) */}
+        {/* Logout Button */}
         <TouchableOpacity 
           style={[styles.profileBtn, isDark && styles.profileBtnDark]} 
-          onPress={signOut} // Temporary logout for testing
+          onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={24} color={isDark ? "#fff" : "#555"} />
         </TouchableOpacity>

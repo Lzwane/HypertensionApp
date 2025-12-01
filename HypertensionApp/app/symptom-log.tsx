@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { collection, addDoc } from 'firebase/firestore';
+import { db, auth } from './services/firebaseConfig';
 
 export default function SymptomLogScreen() {
   const router = useRouter();
@@ -19,27 +19,54 @@ export default function SymptomLogScreen() {
       return;
     }
 
+    if (!auth.currentUser) {
+      Alert.alert('Error', 'You must be logged in to save data.');
+      return;
+    }
+
+    // Advice Logic for High Severity
+    if (severity >= 4) {
+      let advice = "Your symptom severity is high. Please rest and monitor your blood pressure.";
+      
+      if (symptom.toLowerCase().includes("headache")) {
+        advice = "Severe headaches can be a sign of very high blood pressure. Please check your BP immediately. If it is over 180/120, go to the emergency room.";
+      } else if (symptom.toLowerCase().includes("dizziness")) {
+        advice = "Severe dizziness puts you at risk of falling. Sit or lie down immediately. Drink water. If it persists, call a doctor.";
+      } else if (symptom.toLowerCase().includes("palpitations") || symptom.toLowerCase().includes("chest")) {
+        advice = "Chest pain or severe palpitations require immediate medical attention. Please call emergency services or go to the hospital.";
+      }
+
+      Alert.alert(
+        "Health Alert",
+        advice,
+        [
+          { text: "I understand", onPress: () => saveToCloud() }
+        ]
+      );
+    } else {
+      // Normal save without alert
+      saveToCloud();
+    }
+  };
+
+  const saveToCloud = async () => {
     try {
-      const newEntry = {
-        id: Date.now(),
+      if (!auth.currentUser) return;
+
+      await addDoc(collection(db, 'symptoms'), {
+        userId: auth.currentUser.uid, // User Separation
         symptom,
         severity,
         notes,
         date: new Date().toISOString(),
-      };
-
-      const existingData = await AsyncStorage.getItem('symptoms');
-      const logs = existingData ? JSON.parse(existingData) : [];
-
-      logs.unshift(newEntry); // Add to top
-      await AsyncStorage.setItem('symptoms', JSON.stringify(logs));
+      });
 
       Alert.alert('Success', 'Symptom recorded.');
       router.back(); 
     } catch (error) {
-      Alert.alert('Error', 'Could not save data');
+      Alert.alert('Error', 'Could not save to cloud');
     }
-  };
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

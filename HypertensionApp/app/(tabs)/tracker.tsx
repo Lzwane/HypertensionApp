@@ -1,14 +1,15 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useCallback, useEffect } from 'react';
 import { Pedometer } from 'expo-sensors';
 import { Ionicons } from '@expo/vector-icons';
+// Firebase Imports
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db, auth } from '../services/firebaseConfig';
 
-// Data Types
-interface BPReading { id: number; systolic: string; diastolic: string; date: string; }
-interface FoodLog { id: number; meal: string; description: string; date: string; }
-interface SymptomLog { id: number; symptom: string; severity: number; date: string; }
+interface BPReading { id: string; systolic: string; diastolic: string; date: string; }
+interface FoodLog { id: string; meal: string; description: string; date: string; }
+interface SymptomLog { id: string; symptom: string; severity: number; date: string; }
 
 export default function TrackerScreen() {
   const router = useRouter();
@@ -16,46 +17,78 @@ export default function TrackerScreen() {
   const [lastMeal, setLastMeal] = useState<FoodLog | null>(null);
   const [lastSymptom, setLastSymptom] = useState<SymptomLog | null>(null);
   
-  // Pedometer
   const [currentStepCount, setCurrentStepCount] = useState(0);
-  const [isPedometerAvailable, setIsPedometerAvailable] = useState('checking');
+  const [refreshing, setRefreshing] = useState(false);
 
+  // Load data whenever the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadUserData();
     }, [])
   );
 
-  const loadData = async () => {
+  const loadUserData = async () => {
+    if (!auth.currentUser) return;
+
     try {
-      const bpData = await AsyncStorage.getItem('bp_readings');
-      if (bpData) {
-        const readings = JSON.parse(bpData);
-        if (readings.length > 0) setLastReading(readings[0]);
-      }
-      
-      const foodData = await AsyncStorage.getItem('food_logs');
-      if (foodData) {
-        const logs = JSON.parse(foodData);
-        if (logs.length > 0) setLastMeal(logs[0]);
+      // 1. Get Latest BP
+      const bpQuery = query(
+        collection(db, 'bp_readings'),
+        where('userId', '==', auth.currentUser.uid),
+        orderBy('date', 'desc'),
+        limit(1)
+      );
+      const bpSnap = await getDocs(bpQuery);
+      if (!bpSnap.empty) {
+        setLastReading({ id: bpSnap.docs[0].id, ...bpSnap.docs[0].data() } as BPReading);
+      } else {
+        setLastReading(null);
       }
 
-      const symptomData = await AsyncStorage.getItem('symptoms');
-      if (symptomData) {
-        const logs = JSON.parse(symptomData);
-        if (logs.length > 0) setLastSymptom(logs[0]);
+      // 2. Get Latest Food
+      const foodQuery = query(
+        collection(db, 'food_logs'),
+        where('userId', '==', auth.currentUser.uid),
+        orderBy('date', 'desc'),
+        limit(1)
+      );
+      const foodSnap = await getDocs(foodQuery);
+      if (!foodSnap.empty) {
+        setLastMeal({ id: foodSnap.docs[0].id, ...foodSnap.docs[0].data() } as FoodLog);
+      } else {
+        setLastMeal(null);
       }
+
+      // 3. Get Latest Symptom
+      const symptomQuery = query(
+        collection(db, 'symptoms'),
+        where('userId', '==', auth.currentUser.uid),
+        orderBy('date', 'desc'),
+        limit(1)
+      );
+      const symptomSnap = await getDocs(symptomQuery);
+      if (!symptomSnap.empty) {
+        setLastSymptom({ id: symptomSnap.docs[0].id, ...symptomSnap.docs[0].data() } as SymptomLog);
+      } else {
+        setLastSymptom(null);
+      }
+
     } catch (error) {
-      console.log('Error loading data', error);
+      console.log('Error loading tracker data', error);
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadUserData();
+    setRefreshing(false);
+  }, []);
+
+  // Pedometer Logic
   useEffect(() => {
     let subscription: any;
     const subscribe = async () => {
       const isAvailable = await Pedometer.isAvailableAsync();
-      setIsPedometerAvailable(String(isAvailable));
-
       if (isAvailable) {
         const perm = await Pedometer.requestPermissionsAsync();
         if (perm.granted) {
@@ -76,7 +109,10 @@ export default function TrackerScreen() {
   }, []);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView 
+      contentContainerStyle={styles.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <Text style={styles.header}>Daily Tracker</Text>
 
       {/* 1. STEP COUNTER */}
@@ -137,6 +173,7 @@ export default function TrackerScreen() {
         ) : (
           <Text style={styles.cardContent}>Feeling unwell? Log it here.</Text>
         )}
+        
         <TouchableOpacity style={[styles.button, { backgroundColor: '#e67e22' }]} onPress={() => router.push('/symptom-log')}>
           <Text style={styles.buttonText}>{lastSymptom ? '+ Log Another' : '+ Log Symptoms'}</Text>
         </TouchableOpacity>
@@ -160,6 +197,7 @@ export default function TrackerScreen() {
         ) : (
           <Text style={styles.cardContent}>Track what you eat to monitor sodium.</Text>
         )}
+
         <TouchableOpacity style={[styles.button, { backgroundColor: '#27ae60' }]} onPress={() => router.push('/food-log')}>
           <Text style={styles.buttonText}>{lastMeal ? '+ Add Another Meal' : '+ Add Meal'}</Text>
         </TouchableOpacity>
@@ -175,7 +213,7 @@ const styles = StyleSheet.create({
   
   // Step Card
   stepCard: {
-    backgroundColor: '#34495e', // Dark Blue/Grey
+    backgroundColor: '#34495e',
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,

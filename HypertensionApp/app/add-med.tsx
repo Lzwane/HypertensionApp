@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
+// Firebase Imports
+import { collection, addDoc } from 'firebase/firestore';
+import { db, auth } from './services/firebaseConfig';
 
 export default function AddMedScreen() {
   const router = useRouter();
@@ -16,14 +18,12 @@ export default function AddMedScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   const scheduleNotification = async (medName: string, time: Date) => {
-    // 1. Check/Request Permission
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'We cannot send reminders without permission.');
       return null;
     }
 
-    // 2. Schedule the Notification
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: "Medication Reminder",
@@ -31,7 +31,6 @@ export default function AddMedScreen() {
         sound: true,
       },
       trigger: {
-        // FIX: Explicitly set the type to DAILY
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: time.getHours(),
         minute: time.getMinutes(),
@@ -45,7 +44,6 @@ export default function AddMedScreen() {
     if (Platform.OS === 'android') {
       setShowTimePicker(false);
     }
-    
     if (selectedDate) {
       setReminderTime(selectedDate);
     }
@@ -57,6 +55,11 @@ export default function AddMedScreen() {
       return;
     }
 
+    if (!auth.currentUser) {
+      Alert.alert('Error', 'You must be logged in to save data.');
+      return;
+    }
+
     try {
       let notificationId = null;
 
@@ -64,27 +67,23 @@ export default function AddMedScreen() {
         notificationId = await scheduleNotification(name, reminderTime);
       }
 
-      const newMed = {
-        id: Date.now(),
+      // Save to Firebase instead of AsyncStorage
+      await addDoc(collection(db, 'medications'), {
+        userId: auth.currentUser.uid, // Separates data by user
         name,
         dosage,
         instructions,
         reminder: reminderEnabled,
         reminderTime: reminderEnabled ? reminderTime.toISOString() : null,
         notificationId,
-      };
-
-      const existingData = await AsyncStorage.getItem('medications');
-      const meds = existingData ? JSON.parse(existingData) : [];
-
-      meds.push(newMed);
-      await AsyncStorage.setItem('medications', JSON.stringify(meds));
+        createdAt: new Date().toISOString()
+      });
 
       const timeString = reminderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       Alert.alert('Success', `Medication added! ${reminderEnabled ? `(Reminder set for ${timeString})` : ''}`);
       router.back(); 
     } catch (error) {
-      Alert.alert('Error', 'Could not save data');
+      Alert.alert('Error', 'Could not save to cloud');
       console.log(error);
     }
   };

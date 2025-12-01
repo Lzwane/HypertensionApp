@@ -1,8 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth'; // <--- Simpler import
 
-// ⚠️ REPLACE THESE WITH YOUR REAL KEYS FROM FIREBASE CONSOLE
-
+// ⚠️ REPLACE WITH YOUR KEYS
 const firebaseConfig = {
   apiKey: "AIzaSyAeu03l2JkCGwlj06L6dUJFFulXv8Y9OwY",
   authDomain: "hypertensionapp-a4e74.firebaseapp.com",
@@ -16,8 +16,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Export the database instance so other files can use it
+// Initialize Auth (Simple version that usually auto-detects React Native)
+export const auth = getAuth(app);
+
+// Initialize Database
 export const db = getFirestore(app);
 
-// Export a default object to prevent Expo Router warnings
 export default app;

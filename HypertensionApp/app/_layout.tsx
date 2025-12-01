@@ -5,7 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import 'react-native-reanimated';
-import { SessionProvider, useSession } from './ctx'; // Import the session provider
+import { SessionProvider, useSession } from './ctx';
 
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
@@ -22,7 +22,8 @@ Notifications.setNotificationHandler({
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { session, isLoading } = useSession();
+  // 1. Get the Firebase User object
+  const { user, isLoading } = useSession();
   const segments = useSegments();
   const router = useRouter();
   const [loaded] = useFonts({
@@ -35,30 +36,25 @@ function RootLayoutNav() {
     }
   }, [loaded]);
 
-  // Auth Protection Logic
+  // 2. Auth Protection Logic
   useEffect(() => {
     if (isLoading) return;
 
-    // Check if the user is in the (tabs) group
+    // Check which group we are in
     const inTabsGroup = segments[0] === '(tabs)';
+    
+    // EXPLICIT TYPE CASTING to fix TypeScript errors with segments
+    const segmentStr = segments[0] as string | undefined; 
+    const inAuthGroup = segmentStr === 'login' || segmentStr === 'signup';
 
-    if (!session && inTabsGroup) {
-      // If not logged in and trying to access tabs, go to login
+    if (!user && inTabsGroup) {
+      // Not logged in -> Go to Login
       router.replace('/login' as Href);
-    } else if (session && !inTabsGroup) {
-      // If logged in and on login page, go to home
-      // Check if we are specifically on login or signup to redirect
-      // Otherwise we might redirect loop if we are on a modal or something
-      // FIX: Cast segments[0] to string to avoid type overlap errors
-      const currentSegment = segments[0] as string;
-      // Using (segments as string[]).length to satisfy TS
-      const isRoot = (segments as string[]).length === 0;
-      
-      if (currentSegment === 'login' || currentSegment === 'signup' || isRoot) {
-         router.replace('/(tabs)' as Href);
-      }
+    } else if (user && inAuthGroup) {
+      // Logged in but on Login page -> Go to Home
+      router.replace('/(tabs)' as Href);
     }
-  }, [session, isLoading, segments]);
+  }, [user, isLoading, segments]);
 
   if (!loaded) {
     return null;
@@ -73,6 +69,7 @@ function RootLayoutNav() {
         <Stack.Screen name="+not-found" />
         <Stack.Screen name="bp-log" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="food-log" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="symptom-log" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="add-med" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="quiz" options={{ headerShown: false }} />
         <Stack.Screen name="pharmacy" options={{ headerShown: false }} />

@@ -1,11 +1,13 @@
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+// Firebase Imports
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../services/firebaseConfig';
 
 interface Medication {
-  id: number;
+  id: string;
   name: string;
   dosage: string;
   instructions: string;
@@ -23,17 +25,27 @@ export default function MedicationsScreen() {
   );
 
   const loadMeds = async () => {
+    if (!auth.currentUser) return;
+
     try {
-      const existingData = await AsyncStorage.getItem('medications');
-      if (existingData) {
-        setMeds(JSON.parse(existingData));
-      }
+      const q = query(
+        collection(db, 'medications'),
+        where('userId', '==', auth.currentUser.uid)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const loadedMeds: Medication[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedMeds.push({ id: doc.id, ...doc.data() } as Medication);
+      });
+      
+      setMeds(loadedMeds);
     } catch (error) {
       console.log('Error loading meds', error);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     Alert.alert(
       "Delete Medication",
       "Are you sure?",
@@ -43,9 +55,12 @@ export default function MedicationsScreen() {
           text: "Delete", 
           style: "destructive",
           onPress: async () => {
-            const newMeds = meds.filter(m => m.id !== id);
-            setMeds(newMeds);
-            await AsyncStorage.setItem('medications', JSON.stringify(newMeds));
+            try {
+              await deleteDoc(doc(db, 'medications', id));
+              loadMeds(); // Refresh list
+            } catch (error) {
+              Alert.alert('Error', 'Could not delete medication');
+            }
           }
         }
       ]
@@ -80,7 +95,7 @@ export default function MedicationsScreen() {
       ) : (
         <FlatList
           data={meds}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
         />

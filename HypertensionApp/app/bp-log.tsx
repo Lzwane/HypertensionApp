@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// 1. Import Firebase functions
+import { collection, addDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db, auth } from './services/firebaseConfig';
 
 interface BPReading {
-  id: number;
+  id: string;
   systolic: string;
   diastolic: string;
   date: string;
@@ -21,13 +23,25 @@ export default function BPLogScreen() {
   }, []);
 
   const loadHistory = async () => {
+    // 2. Security Check: Must be logged in
+    if (!auth.currentUser) return;
+
     try {
-      const existingData = await AsyncStorage.getItem('bp_readings');
-      if (existingData) {
-        // Show only the last 5 readings
-        const readings = JSON.parse(existingData);
-        setHistory(readings.slice(0, 5));
-      }
+      // 3. Query ONLY this user's data
+      const q = query(
+        collection(db, 'bp_readings'),
+        where('userId', '==', auth.currentUser.uid), // <--- The Magic Filter
+        orderBy('date', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const readings: BPReading[] = [];
+      querySnapshot.forEach((doc) => {
+        readings.push({ id: doc.id, ...doc.data() } as BPReading);
+      });
+      
+      // Show only last 5
+      setHistory(readings.slice(0, 5));
     } catch (error) {
       console.log('Error loading history', error);
     }
@@ -39,25 +53,24 @@ export default function BPLogScreen() {
       return;
     }
 
+    if (!auth.currentUser) {
+      Alert.alert('Error', 'You must be logged in to save.');
+      return;
+    }
+
     try {
-      const newReading = {
-        id: Date.now(),
+      // 4. Save to Cloud with User ID
+      await addDoc(collection(db, 'bp_readings'), {
+        userId: auth.currentUser.uid, // <--- Link data to Lethabo/Grace
         systolic,
         diastolic,
         date: new Date().toISOString(),
-      };
+      });
 
-      const existingData = await AsyncStorage.getItem('bp_readings');
-      const readings = existingData ? JSON.parse(existingData) : [];
-
-      readings.unshift(newReading);
-      await AsyncStorage.setItem('bp_readings', JSON.stringify(readings));
-
-      Alert.alert('Success', 'Reading saved!');
+      Alert.alert('Success', 'Reading saved to cloud!');
       router.back(); 
-    } catch (error) {
-      Alert.alert('Error', 'Could not save data');
-      console.error(error);
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
     }
   };
 
@@ -97,22 +110,21 @@ export default function BPLogScreen() {
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Reading</Text>
+        <Text style={styles.saveButtonText}>Save to Cloud</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
         <Text style={styles.cancelButtonText}>Cancel</Text>
       </TouchableOpacity>
 
-      {/* History Section */}
       <View style={styles.historyContainer}>
-        <Text style={styles.historyTitle}>Recent Trends</Text>
+        <Text style={styles.historyTitle}>Your Recent Trends</Text>
         {history.length === 0 ? (
-          <Text style={styles.emptyText}>No previous readings.</Text>
+          <Text style={styles.emptyText}>No readings found for this user.</Text>
         ) : (
           <FlatList
             data={history}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => item.id}
             renderItem={renderHistoryItem}
             style={styles.historyList}
           />
@@ -149,8 +161,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   cancelButtonText: { color: '#e74c3c', fontSize: 16 },
-  
-  // History Styles
   historyContainer: { marginTop: 30, flex: 1 },
   historyTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#555' },
   historyList: { flex: 1 },
