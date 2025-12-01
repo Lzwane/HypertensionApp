@@ -1,33 +1,19 @@
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useColorScheme, StatusBar } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSession } from '../ctx'; // Import session hook
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [userName, setUserName] = useState('User');
-  const colorScheme = useColorScheme(); // Detects Dark Mode
+  const { userName, signOut } = useSession(); // Get name and signOut function
+  const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-
-  useFocusEffect(
-    useCallback(() => {
-      loadUser();
-    }, [])
-  );
-
-  const loadUser = async () => {
-    try {
-      const name = await AsyncStorage.getItem('user_name');
-      if (name) setUserName(name);
-    } catch (e) { console.log(e); }
-  };
 
   // Helper function to get time-sensitive greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning,";
-    if (hour < 17) return "Good Afternoon,"; // Before 5 PM
+    if (hour < 17) return "Good Afternoon,";
     return "Good Evening,";
   };
 
@@ -63,13 +49,17 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>{getGreeting()}</Text>
-          <Text style={[styles.username, isDark && styles.textLight]}>{userName}</Text>
+          <Text style={[styles.username, isDark && styles.textLight]}>
+            {userName || 'User'}
+          </Text>
         </View>
+        
+        {/* Logout Button (Small tweak to profile button behavior) */}
         <TouchableOpacity 
           style={[styles.profileBtn, isDark && styles.profileBtnDark]} 
-          onPress={() => router.push('/profile')}
+          onPress={signOut} // Temporary logout for testing
         >
-          <Ionicons name="person" size={24} color={isDark ? "#fff" : "#555"} />
+          <Ionicons name="log-out-outline" size={24} color={isDark ? "#fff" : "#555"} />
         </TouchableOpacity>
       </View>
 
@@ -104,7 +94,6 @@ export default function HomeScreen() {
           desc="Pill reminders & list"
         />
 
-        {/* NEW: Doctor Report Section */}
         <MenuItem 
           title="Doctor Report" 
           icon="document-text" 
@@ -113,7 +102,6 @@ export default function HomeScreen() {
           desc="Share summary via WhatsApp/Email"
         />
 
-        {/* NEW: Pharmacy Finder Section */}
         <MenuItem 
           title="Find Pharmacy" 
           icon="location" 

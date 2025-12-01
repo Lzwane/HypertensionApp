@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function PharmacyScreen() {
@@ -36,9 +35,18 @@ export default function PharmacyScreen() {
   const openMaps = () => {
     if (location) {
       const { latitude, longitude } = location.coords;
-      // Opens Apple Maps (or Google Maps on Android) searching for 'Pharmacy' at this location
-      const url = `http://maps.apple.com/?q=Pharmacy&ll=${latitude},${longitude}`;
-      Linking.openURL(url);
+      const label = 'Pharmacy';
+      const url = Platform.select({
+        ios: `maps:0,0?q=${label}&ll=${latitude},${longitude}`,
+        android: `geo:0,0?q=${label}&center=${latitude},${longitude}`,
+      });
+
+      if (url) {
+          Linking.openURL(url).catch(err => {
+              console.error("An error occurred", err);
+              Alert.alert("Error", "Could not open maps application.");
+          });
+      }
     } else {
       Alert.alert("Waiting", "Still getting your location...");
     }
